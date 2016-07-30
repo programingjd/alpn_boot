@@ -1,0 +1,118 @@
+buildscript {
+  repositories {
+    jcenter()
+  }
+  dependencies {
+    classpath 'com.jfrog.bintray.gradle:gradle-bintray-plugin:1.6'
+    classpath 'org.jsoup:jsoup:1.9.2'
+  }
+}
+
+group 'info.jdavid.alpn'
+version '1.00'
+
+apply plugin: 'java'
+apply plugin: 'maven-publish'
+apply plugin: 'com.jfrog.bintray'
+
+sourceCompatibility = 1.7
+targetCompatibility = 1.7
+
+repositories {
+  jcenter()
+}
+
+dependencies {}
+
+test {
+  testLogging {
+    showStandardStreams = true
+  }
+task readme() {
+    def readme = file('README.md')
+    def badge = { String label, String text, String color ->
+      "https://img.shields.io/badge/_${label}_-_${text}-${color}.png?style=flat"
+    }
+    String v = project.version
+    def download =
+      "https://bintray.com/artifact/download/programingjd/maven/info/jdavid/alpn/$v/alpn-boot-${v}.jar"
+    readme.readLines().withIndex().collect { line, i ->
+      switch (i) {
+        case 0:
+          return "![jcenter](${badge('jcenter',v,'6688ff')})"
+        case 9: return "[Download](${download}) the latest jar."
+        case 19: return "  <version>${v}</version>"
+        case 32: return "  compile 'info.jdavid.alpn:alpn-boot:${v}'"
+        default: return line
+      }
+    }.join('\n').with { readme.text = it }
+  }
+  finalizedBy tasks.assemble
+}
+
+javadoc {
+  options.memberLevel = JavadocMemberLevel.PACKAGE
+}
+
+task javadocJar(type: Jar, dependsOn: javadoc) {
+  classifier = 'javadoc'
+  from javadoc.destinationDir
+}
+
+task sourcesJar(type: Jar, dependsOn: classes) {
+  classifier = 'sources'
+  from sourceSets.main.allSource
+}
+
+artifacts {
+  archives sourcesJar, javadocJar
+}
+
+publishing {
+  publications {
+    mavenJava(MavenPublication) {
+      from components.java
+      artifact sourcesJar
+      artifact javadocJar
+    }
+  }
+  repositories {
+    maven {
+      url "$buildDir/repo"
+    }
+  }
+}
+
+
+bintray {
+  user = 'programingjd'
+  key = getBintrayApiKey()
+  dryRun = false
+  publish = true
+  publications = ['mavenJava']
+  pkg {
+    repo = 'maven'
+    name = 'info.jdavid.alpn.boot'
+    websiteUrl = 'https://github.com/programingjd/alpn_boot'
+    issueTrackerUrl = 'https://github.com/programingjd/alpn_boot/issues'
+    vcsUrl = 'https://github.com/programingjd/alpn_boot.git'
+    githubRepo = 'programingjd/alpn_boot'
+    githubReleaseNotesFile = 'README.md'
+    licenses = ['GPL-2.0']
+    labels = ['alpn','http2']
+    publicDownloadNumbers = true
+    version {
+      name = project.version
+      mavenCentralSync {
+        sync = false
+      }
+    }
+  }
+}
+
+tasks.bintrayUpload.dependsOn tasks.check
+
+def getBintrayApiKey() {
+  def f = new File("$projectDir/local.properties")
+  f.text.splitEachLine('=', { if (it && it[0] == 'bintrayApiKey') return it[1] })
+}
