@@ -109,6 +109,9 @@ import javax.net.ssl.SSLEngineResult.*;
  */
 final public class SSLEngineImpl extends SSLEngine {
 
+  // Configured application protocol values
+  String[] applicationProtocols = new String[0];
+
   //
   // Fields and global comments
   //

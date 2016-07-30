@@ -164,7 +164,7 @@ final class ServerHandshaker extends Handshaker {
           activeProtocolVersion, isInitialHandshake, secureRenegotiation,
           clientVerifyData, serverVerifyData);
     doClientAuth = clientAuth;
-    localApl = socket.getApplicationProtocols();
+    localApl = socket.applicationProtocols;
   }
 
   /*
@@ -181,7 +181,7 @@ final class ServerHandshaker extends Handshaker {
           activeProtocolVersion, isInitialHandshake, secureRenegotiation,
           clientVerifyData, serverVerifyData);
     doClientAuth = clientAuth;
-    localApl = engine.getApplicationProtocols();
+    localApl = engine.applicationProtocols;
   }
 
   /*
@@ -493,6 +493,36 @@ final class ServerHandshaker extends Handshaker {
       }
     }
 
+    // check the ALPN extension
+    ALPNExtension clientHelloALPN = (ALPNExtension)
+      mesg.extensions.get(ExtensionType.EXT_ALPN);
+
+    if ((clientHelloALPN != null) && (localApl.length > 0)) {
+
+      // Intersect the requested and the locally supported,
+      // and save for later.
+      String negotiatedValue = null;
+      List<String> protocols = clientHelloALPN.getPeerAPs();
+
+      // Use server preference order
+      for (String ap : localApl) {
+        if (protocols.contains(ap)) {
+          negotiatedValue = ap;
+          break;
+        }
+      }
+
+      if (negotiatedValue == null) {
+        fatalSE(Alerts.alert_no_application_protocol,
+                new SSLHandshakeException(
+                  "No matching ALPN values"));
+      }
+      applicationProtocol = negotiatedValue;
+
+    } else {
+      applicationProtocol = "";
+    }
+
         /*
          * Always make sure this entire record has been digested before we
          * start emitting output, to ensure correct digesting order.
@@ -780,6 +810,13 @@ final class ServerHandshaker extends Handshaker {
       if (!resumingSession) {
         ServerNameExtension serverHelloSNI = new ServerNameExtension();
         m1.extensions.add(serverHelloSNI);
+      }
+    }
+
+    if (isInitialHandshake) {
+      // Prepare the ALPN response
+      if (applicationProtocol != null && !applicationProtocol.isEmpty()) {
+        m1.extensions.add(new ALPNExtension(applicationProtocol));
       }
     }
 

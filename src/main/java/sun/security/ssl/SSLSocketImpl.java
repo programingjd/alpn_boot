@@ -64,6 +64,9 @@ import sun.misc.SharedSecrets;
  */
 final public class SSLSocketImpl extends BaseSSLSocketImpl {
 
+  // Configured application protocol values
+  String[] applicationProtocols = new String[0];
+
     /*
      * ERROR HANDLING GUIDELINES
      * (which exceptions to throw and catch and which not to throw and catch)
