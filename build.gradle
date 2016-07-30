@@ -28,25 +28,25 @@ test {
   testLogging {
     showStandardStreams = true
   }
+}
 task readme() {
-    def readme = file('README.md')
-    def badge = { String label, String text, String color ->
-      "https://img.shields.io/badge/_${label}_-_${text}-${color}.png?style=flat"
-    }
-    String v = project.version
-    def download =
-      "https://bintray.com/artifact/download/programingjd/maven/info/jdavid/alpn/$v/alpn-boot-${v}.jar"
-    readme.readLines().withIndex().collect { line, i ->
-      switch (i) {
-        case 0:
-          return "![jcenter](${badge('jcenter',v,'6688ff')})"
-        case 9: return "[Download](${download}) the latest jar."
-        case 19: return "  <version>${v}</version>"
-        case 32: return "  compile 'info.jdavid.alpn:alpn-boot:${v}'"
-        default: return line
-      }
-    }.join('\n').with { readme.text = it }
+  def readme = file('README.md')
+  def badge = { String label, String text, String color ->
+    "https://img.shields.io/badge/_${label}_-_${text}-${color}.png?style=flat"
   }
+  String v = project.version
+  def download =
+    "https://bintray.com/artifact/download/programingjd/maven/info/jdavid/alpn/$v/alpn-boot-${v}.jar"
+  readme.readLines().withIndex().collect { line, i ->
+    switch (i) {
+      case 0:
+        return "![jcenter](${badge('jcenter',v,'6688ff')})"
+      case 9: return "[Download](${download}) the latest jar."
+      case 19: return "  <version>${v}</version>"
+      case 32: return "  compile 'info.jdavid.alpn:alpn-boot:${v}'"
+      default: return line
+    }
+  }.join('\n').with { readme.text = it }
   finalizedBy tasks.assemble
 }
 
