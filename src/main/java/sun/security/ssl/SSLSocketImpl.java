@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1996, 2013, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1996, 2014, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -176,6 +176,12 @@ final public class SSLSocketImpl extends BaseSSLSocketImpl {
    * Drives the protocol state machine.
    */
   private volatile int        connectionState;
+
+    /*
+     * Flag indicating that the engine's handshaker has done the necessary
+     * steps so the engine may process a ChangeCipherSpec message.
+     */
+    private boolean             receivedCCS;
 
   /*
    * Flag indicating if the next record we receive MUST be a Finished
@@ -560,6 +566,7 @@ final public class SSLSocketImpl extends BaseSSLSocketImpl {
          */
     roleIsServer = isServer;
     connectionState = cs_START;
+        receivedCCS = false;
 
         /*
          * default read and write side cipher and MAC support
@@ -1021,6 +1028,7 @@ final public class SSLSocketImpl extends BaseSSLSocketImpl {
 
               if (handshaker.invalidated) {
                 handshaker = null;
+                        receivedCCS = false;
                 // if state is cs_RENEGOTIATE, revert it to cs_DATA
                 if (connectionState == cs_RENEGOTIATE) {
                   connectionState = cs_DATA;
@@ -1036,6 +1044,7 @@ final public class SSLSocketImpl extends BaseSSLSocketImpl {
                 handshakeSession = null;
                 handshaker = null;
                 connectionState = cs_DATA;
+                        receivedCCS = false;
 
                 //
                 // Tell folk about handshake completion, but do
@@ -1083,12 +1092,23 @@ final public class SSLSocketImpl extends BaseSSLSocketImpl {
             case Record.ct_change_cipher_spec:
               if ((connectionState != cs_HANDSHAKE
                    && connectionState != cs_RENEGOTIATE)
-                  || r.available() != 1
-                  || r.read() != 1) {
+                            || !handshaker.sessionKeysCalculated()
+                            || receivedCCS) {
+                        // For the CCS message arriving in the wrong state
                 fatal(Alerts.alert_unexpected_message,
-                      "illegal change cipher spec msg, state = "
-                      + connectionState);
+                                "illegal change cipher spec msg, conn state = "
+                                + connectionState + ", handshake state = "
+                                + handshaker.state);
+                    } else if (r.available() != 1 || r.read() != 1) {
+                        // For structural/content issues with the CCS
+                        fatal(Alerts.alert_unexpected_message,
+                                "Malformed change cipher spec msg");
               }
+
+                    // Once we've received CCS, update the flag.
+                    // If the remote endpoint sends it again in this handshake
+                    // we won't process it.
+                    receivedCCS = true;
 
               //
               // The first message after a change_cipher_spec
@@ -2480,6 +2500,14 @@ final public class SSLSocketImpl extends BaseSSLSocketImpl {
       handshaker.setAlgorithmConstraints(algorithmConstraints);
     }
   }
+
+    /*
+     * Returns a boolean indicating whether the ChangeCipherSpec message
+     * has been received for this handshake.
+     */
+    boolean receivedChangeCipherSpec() {
+        return receivedCCS;
+    }
 
   //
   // We allocate a separate thread to deliver handshake completion
