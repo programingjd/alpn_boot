@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1996, 2015, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1996, 2017, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -93,7 +93,7 @@ final class ServerHandshaker extends Handshaker {
   private ProtocolVersion clientRequestedVersion;
 
   // client supported elliptic curves
-  private SupportedEllipticCurvesExtension requestedCurves;
+  private EllipticCurvesExtension requestedCurves;
 
   // the preferable signature algorithm used by ServerKeyExchange message
   SignatureAndHashAlgorithm preferableSignatureAlgorithm;
@@ -138,13 +138,17 @@ final class ServerHandshaker extends Handshaker {
       useSmartEphemeralDHKeys = false;
 
       try {
+        // DH parameter generation can be extremely slow, best to
+        // use one of the supported pre-computed DH parameters
+        // (see DHCrypt class).
         customizedDHKeySize = Integer.parseUnsignedInt(property);
-        if (customizedDHKeySize < 1024 || customizedDHKeySize > 2048) {
+        if (customizedDHKeySize < 1024 || customizedDHKeySize > 8192 ||
+            (customizedDHKeySize & 0x3f) != 0) {
           throw new IllegalArgumentException(
             "Unsupported customized DH key size: " +
             customizedDHKeySize + ". " +
-            "The key size can only range from 1024" +
-            " to 2048 (inclusive)");
+            "The key size must be multiple of 64, " +
+            "and can only range from 1024 to 8192 (inclusive)");
         }
       } catch (NumberFormatException nfe) {
         throw new IllegalArgumentException(
@@ -223,9 +227,9 @@ final class ServerHandshaker extends Handshaker {
     switch (type) {
       case HandshakeMessage.ht_client_hello:
         ClientHello ch = new ClientHello(input, message_len);
-                /*
-                 * send it off for processing.
-                 */
+        /*
+         * send it off for processing.
+         */
         this.clientHello(ch);
         break;
 
@@ -243,12 +247,12 @@ final class ServerHandshaker extends Handshaker {
         switch (keyExchange) {
           case K_RSA:
           case K_RSA_EXPORT:
-                    /*
-                     * The client's pre-master secret is decrypted using
-                     * either the server's normal private RSA key, or the
-                     * temporary one used for non-export or signing-only
-                     * certificates/keys.
-                     */
+            /*
+             * The client's pre-master secret is decrypted using
+             * either the server's normal private RSA key, or the
+             * temporary one used for non-export or signing-only
+             * certificates/keys.
+             */
             RSAClientKeyExchange pms = new RSAClientKeyExchange(
               protocolVersion, clientRequestedVersion,
               sslContext.getSecureRandom(), input,
@@ -268,12 +272,12 @@ final class ServerHandshaker extends Handshaker {
           case K_DHE_RSA:
           case K_DHE_DSS:
           case K_DH_ANON:
-                    /*
-                     * The pre-master secret is derived using the normal
-                     * Diffie-Hellman calculation.   Note that the main
-                     * protocol difference in these five flavors is in how
-                     * the ServerKeyExchange message was constructed!
-                     */
+            /*
+             * The pre-master secret is derived using the normal
+             * Diffie-Hellman calculation.   Note that the main
+             * protocol difference in these five flavors is in how
+             * the ServerKeyExchange message was constructed!
+             */
             preMasterSecret = this.clientKeyExchange(
               new DHClientKeyExchange(input));
             break;
@@ -288,6 +292,11 @@ final class ServerHandshaker extends Handshaker {
           default:
             throw new SSLProtocolException
               ("Unrecognized key exchange: " + keyExchange);
+        }
+
+        // Need to add the hash for RFC 7627.
+        if (session.getUseExtendedMasterSecret()) {
+          input.digestNow();
         }
 
         //
@@ -496,6 +505,27 @@ final class ServerHandshaker extends Handshaker {
       }
     }
 
+    // check out the "extended_master_secret" extension
+    if (useExtendedMasterSecret) {
+      ExtendedMasterSecretExtension extendedMasterSecretExtension =
+        (ExtendedMasterSecretExtension)mesg.extensions.get(
+          ExtensionType.EXT_EXTENDED_MASTER_SECRET);
+      if (extendedMasterSecretExtension != null) {
+        requestedToUseEMS = true;
+      } else if (mesg.protocolVersion.v >= ProtocolVersion.TLS10.v) {
+        if (!allowLegacyMasterSecret) {
+          // For full handshake, if the server receives a ClientHello
+          // without the extension, it SHOULD abort the handshake if
+          // it does not wish to interoperate with legacy clients.
+          //
+          // As if extended master extension is required for full
+          // handshake, it MUST be used in abbreviated handshake too.
+          fatalSE(Alerts.alert_handshake_failure,
+                  "Extended Master Secret extension is required");
+        }
+      }
+    }
+
     // check the ALPN extension
     ALPNExtension clientHelloALPN = (ALPNExtension)
       mesg.extensions.get(ExtensionType.EXT_ALPN);
@@ -526,21 +556,21 @@ final class ServerHandshaker extends Handshaker {
       applicationProtocol = "";
     }
 
-        /*
-         * Always make sure this entire record has been digested before we
-         * start emitting output, to ensure correct digesting order.
-         */
+    /*
+     * Always make sure this entire record has been digested before we
+     * start emitting output, to ensure correct digesting order.
+     */
     input.digestNow();
 
-        /*
-         * FIRST, construct the ServerHello using the options and priorities
-         * from the ClientHello.  Update the (pending) cipher spec as we do
-         * so, and save the client's version to protect against rollback
-         * attacks.
-         *
-         * There are a bunch of minor tasks here, and one major one: deciding
-         * if the short or the full handshake sequence will be used.
-         */
+    /*
+     * FIRST, construct the ServerHello using the options and priorities
+     * from the ClientHello.  Update the (pending) cipher spec as we do
+     * so, and save the client's version to protect against rollback
+     * attacks.
+     *
+     * There are a bunch of minor tasks here, and one major one: deciding
+     * if the short or the full handshake sequence will be used.
+     */
     ServerHello m1 = new ServerHello();
 
     clientRequestedVersion = mesg.protocolVersion;
@@ -600,8 +630,42 @@ final class ServerHandshaker extends Handshaker {
         if (resumingSession) {
           ProtocolVersion oldVersion = previous.getProtocolVersion();
           // cannot resume session with different version
-          if (oldVersion != protocolVersion) {
+          if (oldVersion != mesg.protocolVersion) {
             resumingSession = false;
+          }
+        }
+
+        if (resumingSession && useExtendedMasterSecret) {
+          if (requestedToUseEMS &&
+              !previous.getUseExtendedMasterSecret()) {
+            // For abbreviated handshake request, If the original
+            // session did not use the "extended_master_secret"
+            // extension but the new ClientHello contains the
+            // extension, then the server MUST NOT perform the
+            // abbreviated handshake.  Instead, it SHOULD continue
+            // with a full handshake.
+            resumingSession = false;
+          } else if (!requestedToUseEMS &&
+                     previous.getUseExtendedMasterSecret()) {
+            // For abbreviated handshake request, if the original
+            // session used the "extended_master_secret" extension
+            // but the new ClientHello does not contain it, the
+            // server MUST abort the abbreviated handshake.
+            fatalSE(Alerts.alert_handshake_failure,
+                    "Missing Extended Master Secret extension " +
+                    "on session resumption");
+          } else if (!requestedToUseEMS &&
+                     !previous.getUseExtendedMasterSecret()) {
+            // For abbreviated handshake request, if neither the
+            // original session nor the new ClientHello uses the
+            // extension, the server SHOULD abort the handshake.
+            if (!allowLegacyResumption) {
+              fatalSE(Alerts.alert_handshake_failure,
+                      "Missing Extended Master Secret extension " +
+                      "on session resumption");
+            } else {  // Otherwise, continue with a full handshake.
+              resumingSession = false;
+            }
           }
         }
 
@@ -718,7 +782,7 @@ final class ServerHandshaker extends Handshaker {
         throw new SSLException("Client did not resume a session");
       }
 
-      requestedCurves = (SupportedEllipticCurvesExtension)
+      requestedCurves = (EllipticCurvesExtension)
         mesg.extensions.get(ExtensionType.EXT_ELLIPTIC_CURVES);
 
       // We only need to handle the "signature_algorithm" extension
@@ -751,7 +815,9 @@ final class ServerHandshaker extends Handshaker {
       session = new SSLSessionImpl(protocolVersion, CipherSuite.C_NULL,
                                    getLocalSupportedSignAlgs(),
                                    sslContext.getSecureRandom(),
-                                   getHostAddressSE(), getPortSE());
+                                   getHostAddressSE(), getPortSE(),
+                                   (requestedToUseEMS &&
+                                    (protocolVersion.v >= ProtocolVersion.TLS10.v)));
 
       if (protocolVersion.v >= ProtocolVersion.TLS12.v) {
         if (peerSupportedSignAlgs != null) {
@@ -816,6 +882,10 @@ final class ServerHandshaker extends Handshaker {
       }
     }
 
+    if (session.getUseExtendedMasterSecret()) {
+      m1.extensions.add(new ExtendedMasterSecretExtension());
+    }
+
     if (isInitialHandshake) {
       // Prepare the ALPN response
       if (applicationProtocol != null && !applicationProtocol.isEmpty()) {
@@ -840,14 +910,14 @@ final class ServerHandshaker extends Handshaker {
     }
 
 
-        /*
-         * SECOND, write the server Certificate(s) if we need to.
-         *
-         * NOTE:  while an "anonymous RSA" mode is explicitly allowed by
-         * the protocol, we can't support it since all of the SSL flavors
-         * defined in the protocol spec are explicitly stated to require
-         * using RSA certificates.
-         */
+    /*
+     * SECOND, write the server Certificate(s) if we need to.
+     *
+     * NOTE:  while an "anonymous RSA" mode is explicitly allowed by
+     * the protocol, we can't support it since all of the SSL flavors
+     * defined in the protocol spec are explicitly stated to require
+     * using RSA certificates.
+     */
     if (keyExchange == K_KRB5 || keyExchange == K_KRB5_EXPORT) {
       // Server certificates are omitted for Kerberos ciphers
 
@@ -858,10 +928,10 @@ final class ServerHandshaker extends Handshaker {
 
       CertificateMsg m2 = new CertificateMsg(certs);
 
-            /*
-             * Set local certs in the SSLSession, output
-             * debug info, and then actually write to the client.
-             */
+      /*
+       * Set local certs in the SSLSession, output
+       * debug info, and then actually write to the client.
+       */
       session.setLocalCertificates(certs);
       if (debug != null && Debug.isOn("handshake")) {
         m2.print(System.out);
@@ -879,14 +949,14 @@ final class ServerHandshaker extends Handshaker {
       }
     }
 
-        /*
-         * THIRD, the ServerKeyExchange message ... iff it's needed.
-         *
-         * It's usually needed unless there's an encryption-capable
-         * RSA cert, or a D-H cert.  The notable exception is that
-         * exportable ciphers used with big RSA keys need to downgrade
-         * to use short RSA keys, even when the key/cert encrypts OK.
-         */
+    /*
+     * THIRD, the ServerKeyExchange message ... iff it's needed.
+     *
+     * It's usually needed unless there's an encryption-capable
+     * RSA cert, or a D-H cert.  The notable exception is that
+     * exportable ciphers used with big RSA keys need to downgrade
+     * to use short RSA keys, even when the key/cert encrypts OK.
+     */
 
     ServerKeyExchange m3;
     switch (keyExchange) {
@@ -1013,9 +1083,9 @@ final class ServerHandshaker extends Handshaker {
       m4.write(output);
     }
 
-        /*
-         * FIFTH, say ServerHelloDone.
-         */
+    /*
+     * FIFTH, say ServerHelloDone.
+     */
     ServerHelloDone m5 = new ServerHelloDone();
 
     if (debug != null && Debug.isOn("handshake")) {
@@ -1023,12 +1093,12 @@ final class ServerHandshaker extends Handshaker {
     }
     m5.write(output);
 
-        /*
-         * Flush any buffered messages so the client will see them.
-         * Ideally, all the messages above go in a single network level
-         * message to the client.  Without big Certificate chains, it's
-         * going to be the common case.
-         */
+    /*
+     * Flush any buffered messages so the client will see them.
+     * Ideally, all the messages above go in a single network level
+     * message to the client.  Without big Certificate chains, it's
+     * going to be the common case.
+     */
     output.flush();
   }
 
@@ -1101,12 +1171,12 @@ final class ServerHandshaker extends Handshaker {
    * This method is called from chooseCipherSuite() in this class.
    */
   boolean trySetCipherSuite(CipherSuite suite) {
-        /*
-         * If we're resuming a session we know we can
-         * support this key exchange algorithm and in fact
-         * have already cached the result of it in
-         * the session state.
-         */
+    /*
+     * If we're resuming a session we know we can
+     * support this key exchange algorithm and in fact
+     * have already cached the result of it in
+     * the session state.
+     */
     if (resumingSession) {
       return true;
     }
@@ -1393,48 +1463,44 @@ final class ServerHandshaker extends Handshaker {
    * We don't reuse these, for improved forward secrecy.
    */
   private void setupEphemeralDHKeys(boolean export, Key key) {
-        /*
-         * 768 bits ephemeral DH private keys were used to be used in
-         * ServerKeyExchange except that exportable ciphers max out at 512
-         * bits modulus values. We still adhere to this behavior in legacy
-         * mode (system property "jdk.tls.ephemeralDHKeySize" is defined
-         * as "legacy").
-         *
-         * Old JDK (JDK 7 and previous) releases don't support DH keys bigger
-         * than 1024 bits. We have to consider the compatibility requirement.
-         * 1024 bits DH key is always used for non-exportable cipher suites
-         * in default mode (system property "jdk.tls.ephemeralDHKeySize"
-         * is not defined).
-         *
-         * However, if applications want more stronger strength, setting
-         * system property "jdk.tls.ephemeralDHKeySize" to "matched"
-         * is a workaround to use ephemeral DH key which size matches the
-         * corresponding authentication key. For example, if the public key
-         * size of an authentication certificate is 2048 bits, then the
-         * ephemeral DH key size should be 2048 bits accordingly unless
-         * the cipher suite is exportable.  This key sizing scheme keeps
-         * the cryptographic strength consistent between authentication
-         * keys and key-exchange keys.
-         *
-         * Applications may also want to customize the ephemeral DH key size
-         * to a fixed length for non-exportable cipher suites. This can be
-         * approached by setting system property "jdk.tls.ephemeralDHKeySize"
-         * to a valid positive integer between 1024 and 2048 bits, inclusive.
-         *
-         * Note that the minimum acceptable key size is 1024 bits except
-         * exportable cipher suites or legacy mode.
-         *
-         * Note that the maximum acceptable key size is 2048 bits because
-         * DH keys bigger than 2048 are not always supported by underlying
-         * JCE providers.
-         *
-         * Note that per RFC 2246, the key size limit of DH is 512 bits for
-         * exportable cipher suites.  Because of the weakness, exportable
-         * cipher suites are deprecated since TLS v1.1 and they are not
-         * enabled by default in Oracle provider. The legacy behavior is
-         * reserved and 512 bits DH key is always used for exportable
-         * cipher suites.
-         */
+    /*
+     * 768 bits ephemeral DH private keys were used to be used in
+     * ServerKeyExchange except that exportable ciphers max out at 512
+     * bits modulus values. We still adhere to this behavior in legacy
+     * mode (system property "jdk.tls.ephemeralDHKeySize" is defined
+     * as "legacy").
+     *
+     * Old JDK (JDK 7 and previous) releases don't support DH keys bigger
+     * than 1024 bits. We have to consider the compatibility requirement.
+     * 1024 bits DH key is always used for non-exportable cipher suites
+     * in default mode (system property "jdk.tls.ephemeralDHKeySize"
+     * is not defined).
+     *
+     * However, if applications want more stronger strength, setting
+     * system property "jdk.tls.ephemeralDHKeySize" to "matched"
+     * is a workaround to use ephemeral DH key which size matches the
+     * corresponding authentication key. For example, if the public key
+     * size of an authentication certificate is 2048 bits, then the
+     * ephemeral DH key size should be 2048 bits accordingly unless
+     * the cipher suite is exportable.  This key sizing scheme keeps
+     * the cryptographic strength consistent between authentication
+     * keys and key-exchange keys.
+     *
+     * Applications may also want to customize the ephemeral DH key size
+     * to a fixed length for non-exportable cipher suites. This can be
+     * approached by setting system property "jdk.tls.ephemeralDHKeySize"
+     * to a valid positive integer between 1024 and 8192 bits, inclusive.
+     *
+     * Note that the minimum acceptable key size is 1024 bits except
+     * exportable cipher suites or legacy mode.
+     *
+     * Note that per RFC 2246, the key size limit of DH is 512 bits for
+     * exportable cipher suites.  Because of the weakness, exportable
+     * cipher suites are deprecated since TLS v1.1 and they are not
+     * enabled by default in Oracle provider. The legacy behavior is
+     * reserved and 512 bits DH key is always used for exportable
+     * cipher suites.
+     */
     int keySize = export ? 512 : 1024;           // default mode
     if (!export) {
       if (useLegacyEphemeralDHKeys) {          // legacy mode
@@ -1442,10 +1508,17 @@ final class ServerHandshaker extends Handshaker {
       } else if (useSmartEphemeralDHKeys) {    // matched mode
         if (key != null) {
           int ks = KeyUtil.getKeySize(key);
-          // Note that SunJCE provider only supports 2048 bits DH
-          // keys bigger than 1024.  Please DON'T use value other
-          // than 1024 and 2048 at present.  We may improve the
-          // underlying providers and key size here in the future.
+
+          // DH parameter generation can be extremely slow, make
+          // sure to use one of the supported pre-computed DH
+          // parameters (see DHCrypt class).
+          //
+          // Old deployed applications may not be ready to support
+          // DH key sizes bigger than 2048 bits.  Please DON'T use
+          // value other than 1024 and 2048 at present.  May improve
+          // the underlying providers and key size limit in the
+          // future when the compatibility and interoperability
+          // impact is limited.
           //
           // keySize = ks <= 1024 ? 1024 : (ks >= 2048 ? 2048 : ks);
           keySize = ks <= 1024 ? 1024 : 2048;
@@ -1464,7 +1537,7 @@ final class ServerHandshaker extends Handshaker {
   private boolean setupEphemeralECDHKeys() {
     int index = (requestedCurves != null) ?
                 requestedCurves.getPreferredCurve(algorithmConstraints) :
-                SupportedEllipticCurvesExtension.getActiveCurves(algorithmConstraints);
+                EllipticCurvesExtension.getActiveCurves(algorithmConstraints);
     if (index < 0) {
       // no match found, cannot use this ciphersuite
       return false;
@@ -1519,8 +1592,8 @@ final class ServerHandshaker extends Handshaker {
         return false;
       }
       ECParameterSpec params = ((ECPublicKey)publicKey).getParams();
-      int id = SupportedEllipticCurvesExtension.getCurveIndex(params);
-      if ((id <= 0) || !SupportedEllipticCurvesExtension.isSupported(id) ||
+      int id = EllipticCurvesExtension.getCurveIndex(params);
+      if ((id <= 0) || !EllipticCurvesExtension.isSupported(id) ||
           ((requestedCurves != null) && !requestedCurves.contains(id))) {
         return false;
       }
@@ -1719,29 +1792,29 @@ final class ServerHandshaker extends Handshaker {
       mesg.print(System.out);
     }
 
-        /*
-         * Verify if client did send the certificate when client
-         * authentication was required, otherwise server should not proceed
-         */
+    /*
+     * Verify if client did send the certificate when client
+     * authentication was required, otherwise server should not proceed
+     */
     if (doClientAuth == SSLEngineImpl.clauth_required) {
       // get X500Principal of the end-entity certificate for X509-based
       // ciphersuites, or Kerberos principal for Kerberos ciphersuites
       session.getPeerPrincipal();
     }
 
-        /*
-         * Verify if client did send clientCertificateVerify message following
-         * the client Certificate, otherwise server should not proceed
-         */
+    /*
+     * Verify if client did send clientCertificateVerify message following
+     * the client Certificate, otherwise server should not proceed
+     */
     if (needClientVerify) {
       fatalSE(Alerts.alert_handshake_failure,
               "client did not send certificate verify message");
     }
 
-        /*
-         * Verify the client's message with the "before" digest of messages,
-         * and forget about continuing to use that digest.
-         */
+    /*
+     * Verify the client's message with the "before" digest of messages,
+     * and forget about continuing to use that digest.
+     */
     boolean verified = mesg.verify(handshakeHash, Finished.CLIENT,
                                    session.getMasterSecret());
 
@@ -1751,27 +1824,27 @@ final class ServerHandshaker extends Handshaker {
       // NOTREACHED
     }
 
-        /*
-         * save client verify data for secure renegotiation
-         */
+    /*
+     * save client verify data for secure renegotiation
+     */
     if (secureRenegotiation) {
       clientVerifyData = mesg.getVerifyData();
     }
 
-        /*
-         * OK, it verified.  If we're doing the full handshake, add that
-         * "Finished" message to the hash of handshake messages, then send
-         * the change_cipher_spec and Finished message.
-         */
+    /*
+     * OK, it verified.  If we're doing the full handshake, add that
+     * "Finished" message to the hash of handshake messages, then send
+     * the change_cipher_spec and Finished message.
+     */
     if (!resumingSession) {
       input.digestNow();
       sendChangeCipherAndFinish(true);
     }
 
-        /*
-         * Update the session cache only after the handshake completed, else
-         * we're open to an attack against a partially completed handshake.
-         */
+    /*
+     * Update the session cache only after the handshake completed, else
+     * we're open to an attack against a partially completed handshake.
+     */
     session.setLastAccessedTime(System.currentTimeMillis());
     if (!resumingSession && session.isRejoinable()) {
       ((SSLSessionContextImpl)sslContext.engineGetServerSessionContext())
@@ -1800,26 +1873,26 @@ final class ServerHandshaker extends Handshaker {
     Finished mesg = new Finished(protocolVersion, handshakeHash,
                                  Finished.SERVER, session.getMasterSecret(), cipherSuite);
 
-        /*
-         * Send the change_cipher_spec record; then our Finished handshake
-         * message will be the last handshake message.  Flush, and now we
-         * are ready for application data!!
-         */
+    /*
+     * Send the change_cipher_spec record; then our Finished handshake
+     * message will be the last handshake message.  Flush, and now we
+     * are ready for application data!!
+     */
     sendChangeCipherSpec(mesg, finishedTag);
 
-        /*
-         * save server verify data for secure renegotiation
-         */
+    /*
+     * save server verify data for secure renegotiation
+     */
     if (secureRenegotiation) {
       serverVerifyData = mesg.getVerifyData();
     }
 
-        /*
-         * Update state machine so client MUST send 'finished' next
-         * The update should only take place if it is not in the fast
-         * handshake mode since the server has to wait for a finished
-         * message from the client.
-         */
+    /*
+     * Update state machine so client MUST send 'finished' next
+     * The update should only take place if it is not in the fast
+     * handshake mode since the server has to wait for a finished
+     * message from the client.
+     */
     if (finishedTag) {
       state = HandshakeMessage.ht_finished;
     }
@@ -1848,14 +1921,14 @@ final class ServerHandshaker extends Handshaker {
                          + message);
     }
 
-        /*
-         * It's ok to get a no_certificate alert from a client of which
-         * we *requested* authentication information.
-         * However, if we *required* it, then this is not acceptable.
-         *
-         * Anyone calling getPeerCertificates() on the
-         * session will get an SSLPeerUnverifiedException.
-         */
+    /*
+     * It's ok to get a no_certificate alert from a client of which
+     * we *requested* authentication information.
+     * However, if we *required* it, then this is not acceptable.
+     *
+     * Anyone calling getPeerCertificates() on the
+     * session will get an SSLPeerUnverifiedException.
+     */
     if ((description == Alerts.alert_no_certificate) &&
         (doClientAuth == SSLEngineImpl.clauth_requested)) {
       return;
@@ -1894,10 +1967,10 @@ final class ServerHandshaker extends Handshaker {
     X509Certificate[] peerCerts = mesg.getCertificateChain();
 
     if (peerCerts.length == 0) {
-            /*
-             * If the client authentication is only *REQUESTED* (e.g.
-             * not *REQUIRED*, this is an acceptable condition.)
-             */
+      /*
+       * If the client authentication is only *REQUESTED* (e.g.
+       * not *REQUIRED*, this is an acceptable condition.)
+       */
       if (doClientAuth == SSLEngineImpl.clauth_requested) {
         return;
       } else {

@@ -101,9 +101,9 @@ final class ExtensionType {
     e(0x0010, "application_layer_protocol_negotiation");
   // IANA registry value: 16
 
-  // extensions defined in RFC 6961
-  static final ExtensionType EXT_STATUS_REQUEST_V2 =
-    e(0x0011, "status_request_v2");      // IANA registry value: 17
+  // extensions defined in RFC 7627
+  static final ExtensionType EXT_EXTENDED_MASTER_SECRET =
+    e(0x0017, "extended_master_secret"); // IANA registry value: 23
 
   // extensions defined in RFC 5746
   static final ExtensionType EXT_RENEGOTIATION_INFO =

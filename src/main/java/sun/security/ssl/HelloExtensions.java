@@ -79,12 +79,14 @@ final class HelloExtensions {
       } else if (extType == ExtensionType.EXT_SIGNATURE_ALGORITHMS) {
         extension = new SignatureAlgorithmsExtension(s, extlen);
       } else if (extType == ExtensionType.EXT_ELLIPTIC_CURVES) {
-        extension = new SupportedEllipticCurvesExtension(s, extlen);
+        extension = new EllipticCurvesExtension(s, extlen);
       } else if (extType == ExtensionType.EXT_EC_POINT_FORMATS) {
         extension =
-          new SupportedEllipticPointFormatsExtension(s, extlen);
+          new EllipticPointFormatsExtension(s, extlen);
       } else if (extType == ExtensionType.EXT_RENEGOTIATION_INFO) {
         extension = new RenegotiationInfoExtension(s, extlen);
+      } else if (extType == ExtensionType.EXT_EXTENDED_MASTER_SECRET) {
+        extension = new ExtendedMasterSecretExtension(s, extlen);
       } else if (extType == ExtensionType.EXT_ALPN) {
         extension = new ALPNExtension(s, extlen);
       } else {

@@ -372,12 +372,12 @@ final public class SSLEngineImpl extends SSLEngine {
     sess = SSLSessionImpl.nullSession;
     handshakeSession = null;
 
-        /*
-         * State is cs_START until we initialize the handshaker.
-         *
-         * Apps using SSLEngine are probably going to be server.
-         * Somewhat arbitrary choice.
-         */
+    /*
+     * State is cs_START until we initialize the handshaker.
+     *
+     * Apps using SSLEngine are probably going to be server.
+     * Somewhat arbitrary choice.
+     */
     roleIsServer = true;
     connectionState = cs_START;
     receivedCCS = false;
@@ -386,11 +386,11 @@ final public class SSLEngineImpl extends SSLEngine {
     serverNames =
       Utilities.addToSNIServerNameList(serverNames, getPeerHost());
 
-        /*
-         * default read and write side cipher and MAC support
-         *
-         * Note:  compression support would go here too
-         */
+    /*
+     * default read and write side cipher and MAC support
+     *
+     * Note:  compression support would go here too
+     */
     readCipher = CipherBox.NULL;
     readAuthenticator = MAC.NULL;
     writeCipher = CipherBox.NULL;
@@ -410,20 +410,20 @@ final public class SSLEngineImpl extends SSLEngine {
     unwrapLock = new Object();
     writeLock = new Object();
 
-        /*
-         * Save the Access Control Context.  This will be used later
-         * for a couple of things, including providing a context to
-         * run tasks in, and for determining which credentials
-         * to use for Subject based (JAAS) decisions
-         */
+    /*
+     * Save the Access Control Context.  This will be used later
+     * for a couple of things, including providing a context to
+     * run tasks in, and for determining which credentials
+     * to use for Subject based (JAAS) decisions
+     */
     acc = AccessController.getContext();
 
-        /*
-         * All outbound application data goes through this OutputRecord,
-         * other data goes through their respective records created
-         * elsewhere.  All inbound data goes through this one
-         * input record.
-         */
+    /*
+     * All outbound application data goes through this OutputRecord,
+     * other data goes through their respective records created
+     * elsewhere.  All inbound data goes through this one
+     * input record.
+     */
     outputRecord =
       new EngineOutputRecord(Record.ct_application_data, this);
     inputRecord = new EngineInputRecord(this);
@@ -516,14 +516,14 @@ final public class SSLEngineImpl extends SSLEngine {
           return HandshakeStatus.NEED_UNWRAP;
         }
       } else if (connectionState == cs_CLOSED) {
-                /*
-                 * Special case where we're closing, but
-                 * still need the close_notify before we
-                 * can officially be closed.
-                 *
-                 * Note isOutboundDone is taken care of by
-                 * hasOutboundData() above.
-                 */
+        /*
+         * Special case where we're closing, but
+         * still need the close_notify before we
+         * can officially be closed.
+         *
+         * Note isOutboundDone is taken care of by
+         * hasOutboundData() above.
+         */
         if (!isInboundDone()) {
           return HandshakeStatus.NEED_UNWRAP;
         } // else not handshaking
@@ -608,14 +608,14 @@ final public class SSLEngineImpl extends SSLEngine {
       throw new SSLException("Algorithm missing:  ", e);
     }
 
-        /*
-         * Dispose of any intermediate state in the underlying cipher.
-         * For PKCS11 ciphers, this will release any attached sessions,
-         * and thus make finalization faster.
-         *
-         * Since MAC's doFinal() is called for every SSL/TLS packet, it's
-         * not necessary to do the same with MAC's.
-         */
+    /*
+     * Dispose of any intermediate state in the underlying cipher.
+     * For PKCS11 ciphers, this will release any attached sessions,
+     * and thus make finalization faster.
+     *
+     * Since MAC's doFinal() is called for every SSL/TLS packet, it's
+     * not necessary to do the same with MAC's.
+     */
     oldCipher.dispose();
   }
 
@@ -784,19 +784,19 @@ final public class SSLEngineImpl extends SSLEngine {
         return readNetRecord(ea);
       }
     } catch (Exception e) {
-            /*
-             * Don't reset position so it looks like we didn't
-             * consume anything.  We did consume something, and it
-             * got us into this situation, so report that much back.
-             * Our days of consuming are now over anyway.
-             */
+      /*
+       * Don't reset position so it looks like we didn't
+       * consume anything.  We did consume something, and it
+       * got us into this situation, so report that much back.
+       * Our days of consuming are now over anyway.
+       */
       fatal(Alerts.alert_internal_error,
             "problem unwrapping net record", e);
       return null;  // make compiler happy
     } finally {
-            /*
-             * Just in case something failed to reset limits properly.
-             */
+      /*
+       * Just in case something failed to reset limits properly.
+       */
       ea.resetLim();
     }
   }
@@ -810,31 +810,31 @@ final public class SSLEngineImpl extends SSLEngine {
     Status status = null;
     HandshakeStatus hsStatus = null;
 
-        /*
-         * See if the handshaker needs to report back some SSLException.
-         */
+    /*
+     * See if the handshaker needs to report back some SSLException.
+     */
     checkTaskThrown();
 
-        /*
-         * Check if we are closing/closed.
-         */
+    /*
+     * Check if we are closing/closed.
+     */
     if (isInboundDone()) {
       return new SSLEngineResult(Status.CLOSED, getHSStatus(null), 0, 0);
     }
 
-        /*
-         * If we're still in cs_HANDSHAKE, make sure it's been
-         * started.
-         */
+    /*
+     * If we're still in cs_HANDSHAKE, make sure it's been
+     * started.
+     */
     synchronized (this) {
       if ((connectionState == cs_HANDSHAKE) ||
           (connectionState == cs_START)) {
         kickstartHandshake();
 
-                /*
-                 * If there's still outbound data to flush, we
-                 * can return without trying to unwrap anything.
-                 */
+        /*
+         * If there's still outbound data to flush, we
+         * can return without trying to unwrap anything.
+         */
         hsStatus = getHSStatus(null);
 
         if (hsStatus == HandshakeStatus.NEED_WRAP) {
@@ -843,31 +843,31 @@ final public class SSLEngineImpl extends SSLEngine {
       }
     }
 
-        /*
-         * Grab a copy of this if it doesn't already exist,
-         * and we can use it several places before anything major
-         * happens on this side.  Races aren't critical
-         * here.
-         */
+    /*
+     * Grab a copy of this if it doesn't already exist,
+     * and we can use it several places before anything major
+     * happens on this side.  Races aren't critical
+     * here.
+     */
     if (hsStatus == null) {
       hsStatus = getHSStatus(null);
     }
 
-        /*
-         * If we have a task outstanding, this *MUST* be done before
-         * doing any more unwrapping, because we could be in the middle
-         * of receiving a handshake message, for example, a finished
-         * message which would change the ciphers.
-         */
+    /*
+     * If we have a task outstanding, this *MUST* be done before
+     * doing any more unwrapping, because we could be in the middle
+     * of receiving a handshake message, for example, a finished
+     * message which would change the ciphers.
+     */
     if (hsStatus == HandshakeStatus.NEED_TASK) {
       return new SSLEngineResult(
         Status.OK, hsStatus, 0, 0);
     }
 
-        /*
-         * Check the packet to make sure enough is here.
-         * This will also indirectly check for 0 len packets.
-         */
+    /*
+     * Check the packet to make sure enough is here.
+     * This will also indirectly check for 0 len packets.
+     */
     int packetLen = inputRecord.bytesInCompletePacket(ea.netData);
 
     // Is this packet bigger than SSL/TLS normally allows?
@@ -884,12 +884,12 @@ final public class SSLEngineImpl extends SSLEngine {
       }
     }
 
-        /*
-         * Check for OVERFLOW.
-         *
-         * To be considered: We could delay enforcing the application buffer
-         * free space requirement until after the initial handshaking.
-         */
+    /*
+     * Check for OVERFLOW.
+     *
+     * To be considered: We could delay enforcing the application buffer
+     * free space requirement until after the initial handshaking.
+     */
     if ((packetLen - Record.headerSize) > ea.getAppRemaining()) {
       return new SSLEngineResult(Status.BUFFER_OVERFLOW, hsStatus, 0, 0);
     }
@@ -900,12 +900,12 @@ final public class SSLEngineImpl extends SSLEngine {
         Status.BUFFER_UNDERFLOW, hsStatus, 0, 0);
     }
 
-        /*
-         * We're now ready to actually do the read.
-         * The only result code we really need to be exactly
-         * right is the HS finished, for signaling to
-         * HandshakeCompletedListeners.
-         */
+    /*
+     * We're now ready to actually do the read.
+     * The only result code we really need to be exactly
+     * right is the HS finished, for signaling to
+     * HandshakeCompletedListeners.
+     */
     try {
       hsStatus = readRecord(ea);
     } catch (SSLException e) {
@@ -914,16 +914,16 @@ final public class SSLEngineImpl extends SSLEngine {
       throw new SSLException("readRecord", e);
     }
 
-        /*
-         * Check the various condition that we could be reporting.
-         *
-         * It's *possible* something might have happened between the
-         * above and now, but it was better to minimally lock "this"
-         * during the read process.  We'll return the current
-         * status, which is more representative of the current state.
-         *
-         * status above should cover:  FINISHED, NEED_TASK
-         */
+    /*
+     * Check the various condition that we could be reporting.
+     *
+     * It's *possible* something might have happened between the
+     * above and now, but it was better to minimally lock "this"
+     * during the read process.  We'll return the current
+     * status, which is more representative of the current state.
+     *
+     * status above should cover:  FINISHED, NEED_TASK
+     */
     status = (isInboundDone() ? Status.CLOSED : Status.OK);
     hsStatus = getHSStatus(hsStatus);
 
@@ -946,33 +946,33 @@ final public class SSLEngineImpl extends SSLEngine {
 
     HandshakeStatus hsStatus = null;
 
-        /*
-         * The various operations will return new sliced BB's,
-         * this will avoid having to worry about positions and
-         * limits in the netBB.
-         */
+    /*
+     * The various operations will return new sliced BB's,
+     * this will avoid having to worry about positions and
+     * limits in the netBB.
+     */
     ByteBuffer readBB = null;
     ByteBuffer decryptedBB = null;
 
     if (getConnectionState() != cs_ERROR) {
 
-            /*
-             * Read a record ... maybe emitting an alert if we get a
-             * comprehensible but unsupported "hello" message during
-             * format checking (e.g. V2).
-             */
+      /*
+       * Read a record ... maybe emitting an alert if we get a
+       * comprehensible but unsupported "hello" message during
+       * format checking (e.g. V2).
+       */
       try {
         readBB = inputRecord.read(ea.netData);
       } catch (IOException e) {
         fatal(Alerts.alert_unexpected_message, e);
       }
 
-            /*
-             * The basic SSLv3 record protection involves (optional)
-             * encryption for privacy, and an integrity check ensuring
-             * data origin authentication.  We do them both here, and
-             * throw a fatal alert if the integrity check fails.
-             */
+      /*
+       * The basic SSLv3 record protection involves (optional)
+       * encryption for privacy, and an integrity check ensuring
+       * data origin authentication.  We do them both here, and
+       * throw a fatal alert if the integrity check fails.
+       */
       try {
         decryptedBB = inputRecord.decrypt(
           readAuthenticator, readCipher, readBB);
@@ -989,24 +989,24 @@ final public class SSLEngineImpl extends SSLEngine {
       //     "decompression failure");
 
 
-            /*
-             * Process the record.
-             */
+      /*
+       * Process the record.
+       */
 
       synchronized (this) {
         switch (inputRecord.contentType()) {
           case Record.ct_handshake:
-                    /*
-                     * Handshake messages always go to a pending session
-                     * handshaker ... if there isn't one, create one.  This
-                     * must work asynchronously, for renegotiation.
-                     *
-                     * NOTE that handshaking will either resume a session
-                     * which was in the cache (and which might have other
-                     * connections in it already), or else will start a new
-                     * session (new keys exchanged) with just this connection
-                     * in it.
-                     */
+            /*
+             * Handshake messages always go to a pending session
+             * handshaker ... if there isn't one, create one.  This
+             * must work asynchronously, for renegotiation.
+             *
+             * NOTE that handshaking will either resume a session
+             * which was in the cache (and which might have other
+             * connections in it already), or else will start a new
+             * session (new keys exchanged) with just this connection
+             * in it.
+             */
             initHandshaker();
             if (!handshaker.activated()) {
               // prior to handshaking, activate the handshake
@@ -1018,13 +1018,13 @@ final public class SSLEngineImpl extends SSLEngine {
               }
             }
 
-                    /*
-                     * process the handshake record ... may contain just
-                     * a partial handshake message or multiple messages.
-                     *
-                     * The handshaker state machine will ensure that it's
-                     * a finished message.
-                     */
+            /*
+             * process the handshake record ... may contain just
+             * a partial handshake message or multiple messages.
+             *
+             * The handshaker state machine will ensure that it's
+             * a finished message.
+             */
             handshaker.process_record(inputRecord, expectingFinished);
             expectingFinished = false;
 
@@ -1073,10 +1073,10 @@ final public class SSLEngineImpl extends SSLEngine {
                 ("Expecting finished message, received data");
             }
 
-                    /*
-                     * Don't return data once the inbound side is
-                     * closed.
-                     */
+            /*
+             * Don't return data once the inbound side is
+             * closed.
+             */
             if (!inboundDone) {
               ea.scatter(decryptedBB.slice());
             }
@@ -1132,18 +1132,18 @@ final public class SSLEngineImpl extends SSLEngine {
             break;
         } // switch
 
-                /*
-                 * We only need to check the sequence number state for
-                 * non-handshaking record.
-                 *
-                 * Note that in order to maintain the handshake status
-                 * properly, we check the sequence number after the last
-                 * record reading process. As we request renegotiation
-                 * or close the connection for wrapped sequence number
-                 * when there is enough sequence number space left to
-                 * handle a few more records, so the sequence number
-                 * of the last record cannot be wrapped.
-                 */
+        /*
+         * We only need to check the sequence number state for
+         * non-handshaking record.
+         *
+         * Note that in order to maintain the handshake status
+         * properly, we check the sequence number after the last
+         * record reading process. As we request renegotiation
+         * or close the connection for wrapped sequence number
+         * when there is enough sequence number space left to
+         * handle a few more records, so the sequence number
+         * of the last record cannot be wrapped.
+         */
         hsStatus = getHSStatus(hsStatus);
         if (connectionState < cs_ERROR && !isInboundDone() &&
             (hsStatus == HandshakeStatus.NOT_HANDSHAKING)) {
@@ -1174,11 +1174,11 @@ final public class SSLEngineImpl extends SSLEngine {
 
     EngineArgs ea = new EngineArgs(appData, offset, length, netData);
 
-        /*
-         * We can be smarter about using smaller buffer sizes later.
-         * For now, force it to be large enough to handle any
-         * valid SSL/TLS record.
-         */
+    /*
+     * We can be smarter about using smaller buffer sizes later.
+     * For now, force it to be large enough to handle any
+     * valid SSL/TLS record.
+     */
     if (netData.remaining() < EngineOutputRecord.maxRecordSize) {
       return new SSLEngineResult(
         Status.BUFFER_OVERFLOW, getHSStatus(null), 0, 0);
@@ -1195,9 +1195,9 @@ final public class SSLEngineImpl extends SSLEngine {
             "problem wrapping app data", e);
       return null;  // make compiler happy
     } finally {
-            /*
-             * Just in case something didn't reset limits properly.
-             */
+      /*
+       * Just in case something didn't reset limits properly.
+       */
       ea.resetLim();
     }
   }
@@ -1211,31 +1211,31 @@ final public class SSLEngineImpl extends SSLEngine {
     Status status = null;
     HandshakeStatus hsStatus = null;
 
-        /*
-         * See if the handshaker needs to report back some SSLException.
-         */
+    /*
+     * See if the handshaker needs to report back some SSLException.
+     */
     checkTaskThrown();
 
-        /*
-         * short circuit if we're closed/closing.
-         */
+    /*
+     * short circuit if we're closed/closing.
+     */
     if (writer.isOutboundDone()) {
       return new SSLEngineResult(Status.CLOSED, getHSStatus(null), 0, 0);
     }
 
-        /*
-         * If we're still in cs_HANDSHAKE, make sure it's been
-         * started.
-         */
+    /*
+     * If we're still in cs_HANDSHAKE, make sure it's been
+     * started.
+     */
     synchronized (this) {
       if ((connectionState == cs_HANDSHAKE) ||
           (connectionState == cs_START)) {
         kickstartHandshake();
 
-                /*
-                 * If there's no HS data available to write, we can return
-                 * without trying to wrap anything.
-                 */
+        /*
+         * If there's no HS data available to write, we can return
+         * without trying to wrap anything.
+         */
         hsStatus = getHSStatus(null);
 
         if (hsStatus == HandshakeStatus.NEED_UNWRAP) {
@@ -1244,31 +1244,31 @@ final public class SSLEngineImpl extends SSLEngine {
       }
     }
 
-        /*
-         * Grab a copy of this if it doesn't already exist,
-         * and we can use it several places before anything major
-         * happens on this side.  Races aren't critical
-         * here.
-         */
+    /*
+     * Grab a copy of this if it doesn't already exist,
+     * and we can use it several places before anything major
+     * happens on this side.  Races aren't critical
+     * here.
+     */
     if (hsStatus == null) {
       hsStatus = getHSStatus(null);
     }
 
-        /*
-         * If we have a task outstanding, this *MUST* be done before
-         * doing any more wrapping, because we could be in the middle
-         * of receiving a handshake message, for example, a finished
-         * message which would change the ciphers.
-         */
+    /*
+     * If we have a task outstanding, this *MUST* be done before
+     * doing any more wrapping, because we could be in the middle
+     * of receiving a handshake message, for example, a finished
+     * message which would change the ciphers.
+     */
     if (hsStatus == HandshakeStatus.NEED_TASK) {
       return new SSLEngineResult(
         Status.OK, hsStatus, 0, 0);
     }
 
-        /*
-         * This will obtain any waiting outbound data, or will
-         * process the outbound appData.
-         */
+    /*
+     * This will obtain any waiting outbound data, or will
+     * process the outbound appData.
+     */
     try {
       synchronized (writeLock) {
         hsStatus = writeRecord(outputRecord, ea);
@@ -1279,12 +1279,12 @@ final public class SSLEngineImpl extends SSLEngine {
       throw new SSLException("Write problems", e);
     }
 
-        /*
-         * writeRecord might have reported some status.
-         * Now check for the remaining cases.
-         *
-         * status above should cover:  NEED_WRAP/FINISHED
-         */
+    /*
+     * writeRecord might have reported some status.
+     * Now check for the remaining cases.
+     *
+     * status above should cover:  NEED_WRAP/FINISHED
+     */
     status = (isOutboundDone() ? Status.CLOSED : Status.OK);
     hsStatus = getHSStatus(hsStatus);
 
@@ -1302,18 +1302,18 @@ final public class SSLEngineImpl extends SSLEngine {
     HandshakeStatus hsStatus =
       writer.writeRecord(eor, ea, writeAuthenticator, writeCipher);
 
-        /*
-         * We only need to check the sequence number state for
-         * non-handshaking record.
-         *
-         * Note that in order to maintain the handshake status
-         * properly, we check the sequence number after the last
-         * record writing process. As we request renegotiation
-         * or close the connection for wrapped sequence number
-         * when there is enough sequence number space left to
-         * handle a few more records, so the sequence number
-         * of the last record cannot be wrapped.
-         */
+    /*
+     * We only need to check the sequence number state for
+     * non-handshaking record.
+     *
+     * Note that in order to maintain the handshake status
+     * properly, we check the sequence number after the last
+     * record writing process. As we request renegotiation
+     * or close the connection for wrapped sequence number
+     * when there is enough sequence number space left to
+     * handle a few more records, so the sequence number
+     * of the last record cannot be wrapped.
+     */
     hsStatus = getHSStatus(hsStatus);
     if (connectionState < cs_ERROR && !isOutboundDone() &&
         (hsStatus == HandshakeStatus.NOT_HANDSHAKING)) {
@@ -1322,10 +1322,10 @@ final public class SSLEngineImpl extends SSLEngine {
       }
     }
 
-        /*
-         * turn off the flag of the first application record if we really
-         * consumed at least byte.
-         */
+    /*
+     * turn off the flag of the first application record if we really
+     * consumed at least byte.
+     */
     if (isFirstAppOutputRecord && ea.deltaApp() > 0) {
       isFirstAppOutputRecord = false;
     }
@@ -1358,17 +1358,17 @@ final public class SSLEngineImpl extends SSLEngine {
     // eventually compress as well.
     writer.writeRecord(eor, writeAuthenticator, writeCipher);
 
-        /*
-         * Check the sequence number state
-         *
-         * Note that in order to maintain the connection I/O
-         * properly, we check the sequence number after the last
-         * record writing process. As we request renegotiation
-         * or close the connection for wrapped sequence number
-         * when there is enough sequence number space left to
-         * handle a few more records, so the sequence number
-         * of the last record cannot be wrapped.
-         */
+    /*
+     * Check the sequence number state
+     *
+     * Note that in order to maintain the connection I/O
+     * properly, we check the sequence number after the last
+     * record writing process. As we request renegotiation
+     * or close the connection for wrapped sequence number
+     * when there is enough sequence number space left to
+     * handle a few more records, so the sequence number
+     * of the last record cannot be wrapped.
+     */
     if ((connectionState < cs_ERROR) && !isOutboundDone()) {
       checkSequenceNumber(writeAuthenticator, eor.contentType());
     }
@@ -1391,24 +1391,24 @@ final public class SSLEngineImpl extends SSLEngine {
   private boolean checkSequenceNumber(Authenticator authenticator, byte type)
     throws IOException {
 
-        /*
-         * Don't bother to check the sequence number for error or
-         * closed connections, or NULL MAC
-         */
+    /*
+     * Don't bother to check the sequence number for error or
+     * closed connections, or NULL MAC
+     */
     if (connectionState >= cs_ERROR || authenticator == MAC.NULL) {
       return false;
     }
 
-        /*
-         * Conservatively, close the connection immediately when the
-         * sequence number is close to overflow
-         */
+    /*
+     * Conservatively, close the connection immediately when the
+     * sequence number is close to overflow
+     */
     if (authenticator.seqNumOverflow()) {
-            /*
-             * TLS protocols do not define a error alert for sequence
-             * number overflow. We use handshake_failure error alert
-             * for handshaking and bad_record_mac for other records.
-             */
+      /*
+       * TLS protocols do not define a error alert for sequence
+       * number overflow. We use handshake_failure error alert
+       * for handshaking and bad_record_mac for other records.
+       */
       if (debug != null && Debug.isOn("ssl")) {
         System.out.println(Thread.currentThread().getName() +
                            ", sequence number extremely close to overflow " +
@@ -1420,12 +1420,12 @@ final public class SSLEngineImpl extends SSLEngine {
       return true; // make the compiler happy
     }
 
-        /*
-         * Ask for renegotiation when need to renew sequence number.
-         *
-         * Don't bother to kickstart the renegotiation when the local is
-         * asking for it.
-         */
+    /*
+     * Ask for renegotiation when need to renew sequence number.
+     *
+     * Don't bother to kickstart the renegotiation when the local is
+     * asking for it.
+     */
     if ((type != Record.ct_handshake) && authenticator.seqNumIsHuge()) {
       if (debug != null && Debug.isOn("ssl")) {
         System.out.println(Thread.currentThread().getName() +
@@ -1451,18 +1451,18 @@ final public class SSLEngineImpl extends SSLEngine {
                          ", closeOutboundInternal()");
     }
 
-        /*
-         * Already closed, ignore
-         */
+    /*
+     * Already closed, ignore
+     */
     if (writer.isOutboundDone()) {
       return;
     }
 
     switch (connectionState) {
 
-        /*
-         * If we haven't even started yet, don't bother reading inbound.
-         */
+      /*
+       * If we haven't even started yet, don't bother reading inbound.
+       */
       case cs_START:
         writer.closeOutbound();
         inboundDone = true;
@@ -1472,9 +1472,9 @@ final public class SSLEngineImpl extends SSLEngine {
       case cs_CLOSED:
         break;
 
-        /*
-         * Otherwise we indicate clean termination.
-         */
+      /*
+       * Otherwise we indicate clean termination.
+       */
       // case cs_HANDSHAKE:
       // case cs_DATA:
       // case cs_RENEGOTIATE:
@@ -1492,9 +1492,9 @@ final public class SSLEngineImpl extends SSLEngine {
 
   @Override
   synchronized public void closeOutbound() {
-        /*
-         * Dump out a close_notify to the remote side
-         */
+    /*
+     * Dump out a close_notify to the remote side
+     */
     if ((debug != null) && Debug.isOn("ssl")) {
       System.out.println(Thread.currentThread().getName() +
                          ", called closeOutbound()");
@@ -1522,9 +1522,9 @@ final public class SSLEngineImpl extends SSLEngine {
                          ", closeInboundInternal()");
     }
 
-        /*
-         * Already closed, ignore
-         */
+    /*
+     * Already closed, ignore
+     */
     if (inboundDone) {
       return;
     }
@@ -1545,30 +1545,30 @@ final public class SSLEngineImpl extends SSLEngine {
    */
   @Override
   synchronized public void closeInbound() throws SSLException {
-        /*
-         * Currently closes the outbound side as well.  The IETF TLS
-         * working group has expressed the opinion that 1/2 open
-         * connections are not allowed by the spec.  May change
-         * someday in the future.
-         */
+    /*
+     * Currently closes the outbound side as well.  The IETF TLS
+     * working group has expressed the opinion that 1/2 open
+     * connections are not allowed by the spec.  May change
+     * someday in the future.
+     */
     if ((debug != null) && Debug.isOn("ssl")) {
       System.out.println(Thread.currentThread().getName() +
                          ", called closeInbound()");
     }
 
-        /*
-         * No need to throw an Exception if we haven't even started yet.
-         */
+    /*
+     * No need to throw an Exception if we haven't even started yet.
+     */
     if ((connectionState != cs_START) && !recvCN) {
       recvCN = true;  // Only receive the Exception once
       fatal(Alerts.alert_internal_error,
             "Inbound closed before receiving peer's close_notify: " +
             "possible truncation attack?");
     } else {
-            /*
-             * Currently, this is a no-op, but in case we change
-             * the close inbound code later.
-             */
+      /*
+       * Currently, this is a no-op, but in case we change
+       * the close inbound code later.
+       */
       closeInboundInternal();
     }
   }
@@ -1658,10 +1658,10 @@ final public class SSLEngineImpl extends SSLEngine {
   synchronized void fatal(byte description, String diagnostic,
                           Throwable cause) throws SSLException {
 
-        /*
-         * If we have no further information, make a general-purpose
-         * message for folks to see.  We generally have one or the other.
-         */
+    /*
+     * If we have no further information, make a general-purpose
+     * message for folks to see.  We generally have one or the other.
+     */
     if (diagnostic == null) {
       diagnostic = "General SSLEngine problem";
     }
@@ -1669,14 +1669,14 @@ final public class SSLEngineImpl extends SSLEngine {
       cause = Alerts.getSSLException(description, cause, diagnostic);
     }
 
-        /*
-         * If we've already shutdown because of an error,
-         * there is nothing we can do except rethrow the exception.
-         *
-         * Most exceptions seen here will be SSLExceptions.
-         * We may find the occasional Exception which hasn't been
-         * converted to a SSLException, so we'll do it here.
-         */
+    /*
+     * If we've already shutdown because of an error,
+     * there is nothing we can do except rethrow the exception.
+     *
+     * Most exceptions seen here will be SSLExceptions.
+     * We may find the occasional Exception which hasn't been
+     * converted to a SSLException, so we'll do it here.
+     */
     if (closeReason != null) {
       if ((debug != null) && Debug.isOn("ssl")) {
         System.out.println(Thread.currentThread().getName() +
@@ -1698,9 +1698,9 @@ final public class SSLEngineImpl extends SSLEngine {
                          ": " + diagnostic + "\n" + cause.toString());
     }
 
-        /*
-         * Ok, this engine's going down.
-         */
+    /*
+     * Ok, this engine's going down.
+     */
     int oldState = connectionState;
     connectionState = cs_ERROR;
 
@@ -1711,10 +1711,10 @@ final public class SSLEngineImpl extends SSLEngine {
       handshakeSession.invalidate();
     }
 
-        /*
-         * If we haven't even started handshaking yet, no need
-         * to generate the fatal close alert.
-         */
+    /*
+     * If we haven't even started handshaking yet, no need
+     * to generate the fatal close alert.
+     */
     if (oldState != cs_START) {
       sendAlert(Alerts.alert_fatal, description);
     }
@@ -1722,11 +1722,11 @@ final public class SSLEngineImpl extends SSLEngine {
     if (cause instanceof SSLException) { // only true if != null
       closeReason = (SSLException)cause;
     } else {
-            /*
-             * Including RuntimeExceptions, but we'll throw those
-             * down below.  The closeReason isn't used again,
-             * except for null checks.
-             */
+      /*
+       * Including RuntimeExceptions, but we'll throw those
+       * down below.  The closeReason isn't used again,
+       * except for null checks.
+       */
       closeReason =
         Alerts.getSSLException(description, cause, diagnostic);
     }
@@ -1948,14 +1948,22 @@ final public class SSLEngineImpl extends SSLEngine {
     switch (connectionState) {
 
       case cs_START:
-            /*
-             * If we need to change the engine mode and the enabled
-             * protocols haven't specifically been set by the user,
-             * change them to the corresponding default ones.
-             */
-        if (roleIsServer != (!flag) &&
-            sslContext.isDefaultProtocolList(enabledProtocols)) {
-          enabledProtocols = sslContext.getDefaultProtocolList(!flag);
+        /*
+         * If we need to change the socket mode and the enabled
+         * protocols and cipher suites haven't specifically been
+         * set by the user, change them to the corresponding
+         * default ones.
+         */
+        if (roleIsServer != (!flag)) {
+          if (sslContext.isDefaultProtocolList(enabledProtocols)) {
+            enabledProtocols =
+              sslContext.getDefaultProtocolList(!flag);
+          }
+
+          if (sslContext.isDefaultCipherSuiteList(enabledCipherSuites)) {
+            enabledCipherSuites =
+              sslContext.getDefaultCipherSuiteList(!flag);
+          }
         }
 
         roleIsServer = !flag;
@@ -1963,20 +1971,20 @@ final public class SSLEngineImpl extends SSLEngine {
         break;
 
       case cs_HANDSHAKE:
-            /*
-             * If we have a handshaker, but haven't started
-             * SSL traffic, we can throw away our current
-             * handshaker, and start from scratch.  Don't
-             * need to call doneConnect() again, we already
-             * have the streams.
-             */
+        /*
+         * If we have a handshaker, but haven't started
+         * SSL traffic, we can throw away our current
+         * handshaker, and start from scratch.  Don't
+         * need to call doneConnect() again, we already
+         * have the streams.
+         */
         assert(handshaker != null);
         if (!handshaker.activated()) {
-                /*
-                 * If we need to change the engine mode and the enabled
-                 * protocols haven't specifically been set by the user,
-                 * change them to the corresponding default ones.
-                 */
+          /*
+           * If we need to change the engine mode and the enabled
+           * protocols haven't specifically been set by the user,
+           * change them to the corresponding default ones.
+           */
           if (roleIsServer != (!flag) &&
               sslContext.isDefaultProtocolList(enabledProtocols)) {
             enabledProtocols = sslContext.getDefaultProtocolList(!flag);
@@ -1997,10 +2005,10 @@ final public class SSLEngineImpl extends SSLEngine {
                              connectionState);
         }
 
-            /*
-             * We can let them continue if they catch this correctly,
-             * we don't need to shut this down.
-             */
+        /*
+         * We can let them continue if they catch this correctly,
+         * we don't need to shut this down.
+         */
         throw new IllegalArgumentException(
           "Cannot change mode after SSL traffic has started");
     }
