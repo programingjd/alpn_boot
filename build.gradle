@@ -9,7 +9,7 @@ buildscript {
 }
 
 group 'info.jdavid.alpn'
-version '8.144'
+version '8.151'
 
 apply plugin: 'java'
 apply plugin: 'maven-publish'
