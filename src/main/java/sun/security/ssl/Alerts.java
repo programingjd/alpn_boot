@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2015, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -34,9 +34,9 @@ import javax.net.ssl.*;
 
 final class Alerts {
 
-    /*
-     * Alerts are always a fixed two byte format (level/description).
-     */
+  /*
+   * Alerts are always a fixed two byte format (level/description).
+   */
 
   // warnings and fatal errors are package private facilities/constants
 
