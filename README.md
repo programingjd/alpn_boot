@@ -1,4 +1,4 @@
-![jcenter](https://img.shields.io/badge/_jcenter_-_8.211-6688ff.png?style=flat)
+![jcenter](https://img.shields.io/badge/_jcenter_-_8.212-6688ff.png?style=flat)
 # alpn_boot
 A java library for ALPN (used for HTTP2 negociation).
 
@@ -7,7 +7,7 @@ A java library for ALPN (used for HTTP2 negociation).
 The maven artifacts are on [Bintray](https://bintray.com/programingjd/maven/info.jdavid.alpn/view)
 and [jcenter](https://bintray.com/search?query=info.jdavid.alpn).
 
-[Download](https://bintray.com/artifact/download/programingjd/maven/info/jdavid/alpn/8.211/alpn-boot-8.211.jar) the latest jar.
+[Download](https://bintray.com/artifact/download/programingjd/maven/info/jdavid/alpn/8.212/alpn-boot-8.212.jar) the latest jar.
 
 __Maven__
 
@@ -17,7 +17,7 @@ Include [those settings](https://bintray.com/repo/downloadMavenRepoSettingsFile/
 <dependency>
   <groupId>info.jdavid.alpn</groupId>
   <artifactId>alpn-boot</artifactId>
-  <version>8.211</version>
+  <version>8.212</version>
 </dependency>
 ```
 __Gradle__
@@ -30,7 +30,7 @@ repositories {
 ```
 ```
 dependencies {
-  compile 'info.jdavid.alpn:alpn-boot:8.211'
+  compile 'info.jdavid.alpn:alpn-boot:8.212'
 }
 ```
 
